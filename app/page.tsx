@@ -1,7 +1,5 @@
 'use client'
 
-import { useState } from 'react'
-import { login } from '../actions/auth'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,7 +9,6 @@ import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
   const router = useRouter()
-  const [isPending, setIsPending] = useState(false)
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -42,7 +39,7 @@ export default function LoginPage() {
         </CardContent>
         <CardFooter className="flex justify-center">
           <p className="text-sm text-gray-600">
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link href="/register" className="text-blue-600 hover:underline">
               Register here
             </Link>
