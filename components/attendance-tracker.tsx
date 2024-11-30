@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { createClient } from '@supabase/supabase-js'
 
 type Student = {
   id: number
@@ -12,25 +13,132 @@ type Student = {
   attendanceCount: number
 }
 
+// Initialize Supabase client with authentication
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+    }
+  }
+)
+
 export default function AttendanceTracker() {
   const [students, setStudents] = useState<Student[]>([])
   const [newStudentName, setNewStudentName] = useState('')
+  const [session, setSession] = useState<any>(null)
 
-  const addStudent = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (newStudentName.trim()) {
-      setStudents([
-        ...students,
-        { id: Date.now(), name: newStudentName.trim(), attendanceCount: 0 }
-      ])
-      setNewStudentName('')
+  useEffect(() => {
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+    })
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    fetchStudents()
+  }, [])
+
+  const fetchStudents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .select('*')
+        .order('id', { ascending: true })
+
+      if (error) throw error
+
+      if (data) {
+        setStudents(data.map(student => ({
+          id: student.id,
+          name: student.name,
+          attendanceCount: student.attendance_count
+        })))
+      }
+    } catch (error) {
+      console.error('Error fetching students:', error)
     }
   }
 
-  const markAttendance = (id: number) => {
-    setStudents(students.map(student =>
-      student.id === id ? { ...student, attendanceCount: student.attendanceCount + 1 } : student
-    ))
+  const addStudent = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (newStudentName.trim()) {
+      try {
+        // Log the attempt
+        console.log('Attempting to add student:', newStudentName.trim())
+
+        // Insert into Supabase
+        const { data, error } = await supabase
+          .from('students')
+          .insert([
+            { 
+              name: newStudentName.trim(), 
+              attendance_count: 0 
+            }
+          ])
+          .select('*')  // Make sure to select all fields after insert
+
+        // Log the response
+        console.log('Supabase response:', { data, error })
+
+        if (error) {
+          console.error('Supabase error:', error)
+          throw error
+        }
+
+        // Update local state with the data from Supabase
+        if (data && data[0]) {
+          setStudents(prevStudents => [
+            ...prevStudents,
+            { 
+              id: data[0].id, 
+              name: data[0].name, 
+              attendanceCount: data[0].attendance_count 
+            }
+          ])
+          setNewStudentName('')
+        }
+      } catch (error) {
+        console.error('Detailed error:', error)
+        alert('Failed to add student. Please check console for details.')
+      }
+    }
+  }
+
+  const markAttendance = async (id: number) => {
+    try {
+      const student = students.find(s => s.id === id)
+      if (!student) return
+
+      const newCount = student.attendanceCount + 1
+
+      const { error } = await supabase
+        .from('students')
+        .update({ attendance_count: newCount })
+        .eq('id', id)
+
+      if (error) throw error
+
+      setStudents(students.map(student =>
+        student.id === id 
+          ? { ...student, attendanceCount: newCount } 
+          : student
+      ))
+    } catch (error) {
+      console.error('Error updating attendance:', error)
+      alert('Failed to mark attendance')
+    }
   }
 
   return (
