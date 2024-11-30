@@ -25,10 +25,22 @@ const supabase = createClient(
   }
 )
 
+// Update the SupabaseSession type to be more specific and remove any
+type SupabaseSession = {
+  user: {
+    id: string;
+    email?: string;
+    // Add other user properties you need
+  };
+  access_token: string;
+  refresh_token: string;
+}
+
 export default function AttendanceTracker() {
   const [students, setStudents] = useState<Student[]>([])
   const [newStudentName, setNewStudentName] = useState('')
-  const [session, setSession] = useState<any>(null)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [session, setSession] = useState<SupabaseSession | null>(null)
 
   useEffect(() => {
     // Check for existing session
